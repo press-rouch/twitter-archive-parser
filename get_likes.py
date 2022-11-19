@@ -51,14 +51,16 @@ def download_file(output_directory, url):
 def get_liked_tweets(contents, output_dict):
     """For every media link found in contents, download the file"""
     with requests.Session() as session:
-        download = twitter_guest_api.TwitterGuestAPI(session)
+        api = twitter_guest_api.TwitterGuestAPI(session)
+        tweet_ids = []
         for found in LIKE_REGEX.finditer(contents):
             tweet_id = found.group(1)
             if tweet_id in output_dict:
                 logging.info("%s already processed", tweet_id)
                 continue
-            logging.info("Getting tweet %s", tweet_id)
-            output_dict[tweet_id] = download.get_tweet(session, tweet_id)
+            tweet_ids.append(tweet_id)
+        new_tweets = api.get_tweets(session, tweet_ids)
+        output_dict.update(new_tweets)
 
 def download_images(media_path, like_dict):
     """Download every image in the liked tweets"""

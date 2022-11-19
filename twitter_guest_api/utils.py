@@ -67,20 +67,28 @@ class TwitterGuestAPI:
                               response.status_code, response.reason)
         return accounts
 
-    def get_tweet(self, session, tweet_id, include_user=True, include_alt_text=True):
+    def get_tweets(self, session, tweet_ids, include_user=True, include_alt_text=True):
         """
-        Get the json metadata for a single tweet.
+        Get the json metadata for multiple tweets.
         If include_user is False, you will only get a numerical id for the user.
         """
-        query_url = f"{SHOW_STATUS_ENDPOINT}?id={tweet_id}&tweet_mode=extended"
-        if not include_user:
-            query_url += "&trim_user=1"
-        if include_alt_text:
-            query_url += "&include_ext_alt_text=1"
-        response = get_response(query_url, session, self.headers)
-        if response.status_code == 200:
-            status_json = json.loads(response.content)
-            return status_json
-        logging.error("Failed to get tweet %s: (%i) %s",
-                      tweet_id, response.status_code, response.reason)
-        return None
+        tweets = {}
+        while tweet_ids:
+            tweet_batch = tweet_ids[:BATCH_MAX]
+            tweet_ids = tweet_ids[BATCH_MAX:]
+            id_list = ",".join(tweet_batch)
+            query_url = f"{LOOKUP_STATUS_ENDPOINT}?id={id_list}&tweet_mode=extended"
+            if not include_user:
+                query_url += "&trim_user=1"
+            if include_alt_text:
+                query_url += "&include_ext_alt_text=1"
+            response = get_response(query_url, session, self.headers)
+            if response.status_code == 200:
+                response_json = json.loads(response.content)
+                for entry in response_json:
+                    tweets[entry["id_str"]] = entry
+                logging.info("Parsed %i tweets, %i remaining", len(response_json), len(tweet_ids))
+            else:
+                logging.error("Failed to get tweets: (%i) %s",
+                              response.status_code, response.reason)
+        return tweets
