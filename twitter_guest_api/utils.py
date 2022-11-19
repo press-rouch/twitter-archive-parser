@@ -2,23 +2,16 @@
 
 import json
 import logging
-import re
 
 # https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/get-statuses-show-id
 SHOW_STATUS_ENDPOINT = "https://api.twitter.com/1.1/statuses/show.json"
-SHOW_STATUS_ENDPOINT = "https://api.twitter.com/1.1/statuses/lookup.json"
+LOOKUP_STATUS_ENDPOINT = "https://api.twitter.com/1.1/statuses/lookup.json"
 # https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/follow-search-get-users/api-reference/get-users-show
 SHOW_USER_ENDPOINT = "https://api.twitter.com/1.1/users/show.json"
+LOOKUP_USER_ENDPOINT = "https://api.twitter.com/1.1/users/lookup.json"
 # Undocumented!
 GUEST_TOKEN_ENDPOINT = "https://api.twitter.com/1.1/guest/activate.json"
-BEARER_TOKEN_PATTERN = re.compile(r'"(AAA\w+%\w+)"')
-
-def send_request(url, session_method, headers):
-    """Attempt an http request"""
-    response = session_method(url, headers=headers, stream=True)
-    if response.status_code != 200:
-        raise Exception(f"Failed request to {url}: {response.status_code} {response.reason}")
-    return response.content.decode("utf-8")
+BEARER_TOKEN = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
 
 def get_guest_token(session, headers):
     """Request a guest token and add it to the headers"""
@@ -41,30 +34,10 @@ def get_response(url, session, headers):
         response = session.get(url, headers=headers, stream=True)
     return response
 
-def initialise_headers(session, url):
+def initialise_headers(session):
     """Populate http headers with necessary information for Twitter queries"""
     headers = {}
-
-    # One of the js files from original url holds the bearer token and query id.
-    container = send_request(url, session.get, headers)
-    js_files = re.findall("src=['\"]([^'\"()]*js)['\"]", container)
-
-    bearer_token = None
-    # Search the javascript files for a bearer token and query ids
-    for jsfile in js_files:
-        logging.debug("Processing %s", jsfile)
-        file_content = send_request(jsfile, session.get, headers)
-        find_bearer_token = BEARER_TOKEN_PATTERN.search(file_content)
-
-        if find_bearer_token:
-            bearer_token = find_bearer_token.group(1)
-            logging.info("Retrieved bearer token: %s", bearer_token)
-            break
-
-    if not bearer_token:
-        raise Exception("Did not find bearer token.")
-
-    headers['authorization'] = f"Bearer {bearer_token}"
+    headers['authorization'] = f"Bearer {BEARER_TOKEN}"
 
     get_guest_token(session, headers)
     return headers
@@ -72,7 +45,7 @@ def initialise_headers(session, url):
 class TwitterGuestAPI:
     """Class to query Twitter API without a developer account"""
     def __init__(self, session):
-        self.headers = initialise_headers(session, "https://www.twitter.com")
+        self.headers = initialise_headers(session)
 
     def get_account(self, session, account_id):
         """Get the json metadata for a user account"""
