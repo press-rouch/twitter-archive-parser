@@ -18,13 +18,15 @@ def get_accounts(filename, output_dict):
         contents = input_file.read()
     with requests.Session() as session:
         api = twitter_guest_api.TwitterGuestAPI(session)
+        account_ids = []
         for found in ACCOUNT_REGEX.finditer(contents):
             account_id = found.group(1)
             if account_id in output_dict:
                 logging.info("%s already processed", account_id)
                 continue
-            logging.info("Getting account %s", account_id)
-            output_dict[account_id] = api.get_account(session, account_id)
+            account_ids.append(account_id)
+        new_accounts = api.get_accounts(session, account_ids)
+        output_dict.update(new_accounts)
 
 def main():
     """Main function"""

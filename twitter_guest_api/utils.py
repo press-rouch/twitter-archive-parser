@@ -13,6 +13,8 @@ LOOKUP_USER_ENDPOINT = "https://api.twitter.com/1.1/users/lookup.json"
 GUEST_TOKEN_ENDPOINT = "https://api.twitter.com/1.1/guest/activate.json"
 BEARER_TOKEN = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
 
+BATCH_MAX = 100
+
 def get_guest_token(session, headers):
     """Request a guest token and add it to the headers"""
     guest_token_response = session.post(GUEST_TOKEN_ENDPOINT, headers=headers, stream=True)
@@ -47,16 +49,23 @@ class TwitterGuestAPI:
     def __init__(self, session):
         self.headers = initialise_headers(session)
 
-    def get_account(self, session, account_id):
-        """Get the json metadata for a user account"""
-        query_url = f"{SHOW_USER_ENDPOINT}?user_id={account_id}"
-        response = get_response(query_url, session, self.headers)
-        if response.status_code == 200:
-            status_json = json.loads(response.content)
-            return status_json
-        logging.error("Failed to get account %s: (%i) %s",
-                      account_id, response.status_code, response.reason)
-        return None
+    def get_accounts(self, session, account_ids):
+        """Get the json metadata for multiple user accounts"""
+        accounts = {}
+        while account_ids:
+            account_batch = account_ids[:BATCH_MAX]
+            account_ids = account_ids[BATCH_MAX:]
+            id_list = ",".join(account_batch)
+            query_url = f"{LOOKUP_USER_ENDPOINT}?user_id={id_list}"
+            response = get_response(query_url, session, self.headers)
+            if response.status_code == 200:
+                response_json = json.loads(response.content)
+                for entry in response_json:
+                    accounts[entry["id_str"]] = entry
+            else:
+                logging.error("Failed to get accounts: (%i) %s",
+                              response.status_code, response.reason)
+        return accounts
 
     def get_tweet(self, session, tweet_id, include_user=True, include_alt_text=True):
         """
